@@ -64,23 +64,41 @@ class Robot(Node):
             rclpy.spin_once(self)
 
 
+        avoiding = False
         shouldStop = False
         while not shouldStop:
             ds = [None] * len(self.laser_scan.ranges)
             ws = [None] * len(self.laser_scan.ranges)
+            minD = float("inf")
+            minIdx = -1
+            minW = float("inf")
             for idx, range in enumerate(self.laser_scan.ranges):
                 angle = self.laser_scan.angle_min + self.laser_scan.angle_increment * idx
                 d = math.cos(angle) * range
                 w = math.sin(angle) * range
                 ds[idx] = d if abs(w) < 0.9 else float("inf")
                 ws[idx] = abs(w)
+                if (ds[idx] < minD):
+                    minD = ds[idx]
+                    minIdx = idx
+                    minW = w
                 # if (abs(w) < 0.9):
                     # shouldStop = True
                     # robot.pub_cmd_vel.publish(Twist())
                     # break
                     # self.get_logger().info('{0:.2f} {1:.2f} {2:.2f} CRASH'.format(min(ds),min(ws), min(self.laser_scan.ranges)))
-            if (min(ds) < 0.9):
+            if (min(ds) < 2.0):
                 self.get_logger().info('{0:.2f} {1:.2f} {2:.2f} CRASH'.format(min(ds), min(ws), min(self.laser_scan.ranges)))
+                avoiding = True
+                twist = Twist()
+                twist.angular.z = 1.0 if (minW < 0.0) else -1.0
+                # twist.linear.x = 1.0
+                self.pub_cmd_vel.publish(twist)
+            elif avoiding:
+                avoiding = False
+                twist = Twist()
+                twist.linear.x = 1.0
+                self.pub_cmd_vel.publish(twist)
             else:
                 self.get_logger().info('{0:.2f} {1:.2f} {2:.2f}'.format(min(ds), min(ws), min(self.laser_scan.ranges)))
             rclpy.spin_once(self)
